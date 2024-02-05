@@ -68,6 +68,50 @@ WHERE sales_rank = 1
 
 5. **Concise and Readable Query:**
     - Achieved a more concise and readable structure, contributing to better understanding and maintenance.
+      
+## $\color{blue}{ Updated \space Query \space Regarding \space Feedback}$
+```
+WITH HighestSales AS (
+
+    SELECT
+        extract (year from t.transaction_date) as date_year,
+        t.salesperson_id,
+        q.quarter_name,
+        SUM(t.order_amount) AS total_sales,
+        DENSE_RANK() OVER (PARTITION BY date_year,q.quarter_name ORDER BY SUM(t.order_amount) DESC) AS sales_rank
+
+    FROM sales_transactions AS t
+    JOIN quarters AS q 
+      ON t.transaction_date BETWEEN q.start_date AND q.end_date
+
+    WHERE EXTRACT(YEAR FROM t.transaction_date) >= EXTRACT(YEAR FROM CURRENT_DATE) - 2
+
+    GROUP BY
+        date_year,
+        q.quarter_name,
+        t.salesperson_id
+)
+
+SELECT
+    date_year,
+    quarter_name,
+    salesperson_id,
+    total_sales
+
+FROM HighestSales
+WHERE sales_rank = 1
+ORDER BY date_year,quarter_name, total_sales desc
+```
+## $\color{blue}{ Updated \space Explanation \space Regarding \space Feedback}$
+
+1. **Missing Date_Year Field in Rank and Grouping:**
+    - The code needs to include the `Date_Year` field in the rank and grouping to ensure data retrieval for all quarters across both 2022 and 2023. This adjustment will result in processing 8 quarters in total.‎
+
+2. **Handling Sales ID with the Highest Sales in Different Years:**
+    - The original code fails to consider scenarios where the same sales ID achieves the highest sales in both 2022 and 2023. To address this, the correction involves calculating the sum for each specific quarter within each year, rather than aggregating across years.
+
+3. **Ineffectiveness of Rank or Dense Rank for First Rank:**
+    - The use of `rank` or `dense rank` window functions in the code does not produce the intended effect, as only the first rank is required. Modifications are necessary to ensure that only the first rank is considered in the analysis.
 
 # Example 2: Identifying the top 5 salespeople based on total sales for the year:
 ```
@@ -150,7 +194,7 @@ WHERE d.manager_name = 'John Smith'
 4. **Descriptive Alias Names:**
    - Descriptive aliases (e for employee, d for department) are utilized to enhance the query's readability and maintainability.
 
-### Example 4: Find Duplicate Rows
+# Example 4: Find Duplicate Rows
 ```
 SELECT 
   employee_id,
@@ -217,7 +261,6 @@ Final as (
 SELECT *
 FROM FINAL
 ```
-
 ## Explanation
 
 1. **Common Table Expression (CTE):**
@@ -231,14 +274,65 @@ FROM FINAL
 
 4. **Percentage Calculation:**
    - The year_over_year_diff_perc is calculated to represent the percentage change. A NULL value is assigned in cases where the previous year's amount is zero, mitigating the risk of division by zero errors.
+     
+## $\color{blue}{ Updated \space Imporved \space Query \space Regarding \space Feedback}$
+```
+WITH year_metrics AS (
+  SELECT
 
-# Example 6: Return the MAX sales and 2nd max sales 
+    EXTRACT(YEAR FROM day) AS year,
+    SUM(daily_amount) AS year_amount
+
+  FROM sales
+  GROUP BY year
+),
+Final AS (
+  SELECT
+
+    year,
+    year_amount,
+    COALESCE(LAG(year_amount) OVER (ORDER BY year), 0) AS revenue_previous_year,
+    year_amount - COALESCE(LAG(year_amount) OVER (ORDER BY year), 0) AS year_over_year_diff_value,
+
+    CASE
+      WHEN COALESCE(LAG(year_amount) OVER (ORDER BY year), 0) = 0
+      THEN NULL
+      ELSE (year_amount - COALESCE(LAG(year_amount) OVER (ORDER BY year), 0)) /
+           COALESCE(LAG(year_amount) OVER (ORDER BY year), 0) * 100
+    END AS year_over_year_diff_perc
+
+  FROM year_metrics
+)
+SELECT *
+FROM Final;
+
+```
+## $\color{blue}{ Updated \space Explanation \space Regarding \space Feedback}$
+
+1. **Removed unnecessary alias `ym` from the SELECT clause in the `Final` CTE.**
+2. **Replaced `ym.year` with `year` in the `Final` CTE to improve readability.**
+3. **Consolidated references to `year_metrics` in the `Final` CTE for clarity.**
+
+# Example 6: Return the MAX sales and 2nd max sales
 ```
 SELECT
 (SELECT MAX(sales) FROM Sales_orders) max_sales,
 (SELECT MAX(sales) FROM Sales_orders
 WHERE sales NOT IN (SELECT MAX(sales) FROM Sales_orders )) as 2ND_max_sales;
 ```
+## Explanation
+
+1. **Common Table Expression (CTE):**
+   - The Common Table Expression (CTE) named RankedSales is effectively utilized to assign a row number to each sales value, employing a descending order as the basis for ranking.
+
+2. **ROW_NUMBER() Function:**
+   - The ROW_NUMBER() window function is employed to streamline the ranking process of sales values, eliminating the need for subqueries and enhancing overall query efficiency.
+
+3. **Conditional Aggregation:**
+   - Conditional aggregation is implemented to derive the second maximum sales value by applying filters based on the assigned sales rank within the RankedSales CTE.
+
+4. **WHERE Clause:**
+   - The WHERE clause is strategically employed to restrict the consideration to only the top two ranked sales values. This optimization enhances performance by reducing unnecessary calculations and focusing on the relevant data subset.
 
 
 ## Imporved Query
@@ -258,20 +352,25 @@ FROM RankedSales
 WHERE sales_rank <= 2
 
 ```
+## $\color{blue}{ Updated \space Imporved \space Query \space Regarding \space Feedback}$
+```
+WITH RankedSales AS (
+  SELECT
+    sales,
+    DENSE_RANK() OVER (ORDER BY sales DESC) AS sales_rank
+  FROM Sales_orders
+)
 
-## Explanation
+SELECT
+  MAX(sales) AS max_sales,
+  COALESCE(MAX(CASE WHEN sales_rank = 2 THEN sales END), 0) AS second_max_sales
+FROM RankedSales
+WHERE sales_rank <= 2;
+```
+## $\color{blue}{ Updated \space Explanation \space Regarding \space Feedback}$
 
-1. **Common Table Expression (CTE):**
-   - The Common Table Expression (CTE) named RankedSales is effectively utilized to assign a row number to each sales value, employing a descending order as the basis for ranking.
-
-2. **ROW_NUMBER() Function:**
-   - The ROW_NUMBER() window function is employed to streamline the ranking process of sales values, eliminating the need for subqueries and enhancing overall query efficiency.
-
-3. **Conditional Aggregation:**
-   - Conditional aggregation is implemented to derive the second maximum sales value by applying filters based on the assigned sales rank within the RankedSales CTE.
-
-4. **WHERE Clause:**
-   - The WHERE clause is strategically employed to restrict the consideration to only the top two ranked sales values. This optimization enhances performance by reducing unnecessary calculations and focusing on the relevant data subset.
+**DENSE_NUMBER() Function:**
+  - Utilize the DENSE_RANK() window function instead of ROW_NUMBER() to enable the second_max_sales to account for multiple sales with the same amount when they share the rank of 2.
 
 
 # Example 7: 
@@ -333,7 +432,37 @@ WHERE Pnumber IN (SELECT Pnumber FROM JohnSmithProjects)
 
 4. **Simplified WHERE Clause:**
    - The WHERE clause in the final SELECT statement is deliberately simplified to filter project numbers based on the JohnSmithProjects CTE. This simplification enhances the clarity of the query and focuses on the essential filtering criterion.
-  
+
+## $\color{blue}{ Updated \space Imporved \space Query 1 \space Regarding \space Feedback}$
+```
+WITH JohnSmithProjects AS (
+    SELECT DISTINCT P.Pnumber
+    FROM PROJECT P
+    JOIN DEPARTMENT D ON P.Dnum = D.Dnumber
+    JOIN EMPLOYEE E ON D.Mgr_ssn = E.Ssn AND E.Lname = 'Smith'
+
+    UNION
+
+    SELECT DISTINCT WO.Pno AS Pnumber
+    FROM WORKS_ON WO
+    JOIN EMPLOYEE E ON WO.Essn = E.Ssn AND E.Lname = 'Smith'
+)
+
+SELECT DISTINCT P.Pnumber
+FROM PROJECT P
+JOIN JohnSmithProjects JSP ON P.Pnumber = JSP.Pnumber
+```
+## $\color{blue}{ Updated \space Explanation 1 \space Regarding \space Feedback}$
+1. **Alias Consistency:**
+   - Ensured clarity through consistent and meaningful aliases like "P" for PROJECT, "D" for DEPARTMENT, and "E" for EMPLOYEE.
+
+2. **CTE Streamlining:**
+   - Refactored CTE "JohnSmithProjects" for conciseness, directly selecting P.Pnumber from PROJECT in the first union.
+
+3. **JOIN Optimization:**
+   - Optimized performance by replacing the IN clause with a JOIN operation in the final SELECT, potentially leveraging database optimizations.
+
+
 ## Imporved Query 2
 
 ```
