@@ -153,6 +153,27 @@ LIMIT 5
 3. **Simplified FROM Clause:**
     - Directly referenced sales_transactions without aliases for enhanced readability.‎
 
+## $\color{blue}{ Updated \space Query \space Regarding \space Feedback}$
+```
+SELECT
+    salesperson_id,
+    SUM(order_amount) AS total_sales
+
+FROM sales_transactions
+WHERE EXTRACT(YEAR FROM transaction_date) = EXTRACT(YEAR FROM CURRENT_DATE) 
+GROUP BY
+  salesperson_id
+ORDER BY
+  total_sales DESC
+LIMIT 5
+```
+
+## $\color{blue}{ Updated \space Explanation \space Regarding \space Feedback}$
+
+1. **I have adjusted the Direct Filtering for the Previous Year, where I assumed that we are now in the first month of 2024. Thus, I am altering this assumption, considering that the data already contains records for the year 2024, in order to obtain the top salespeople for the current year.**
+
+
+
 # Example 3: Return a list of all the employees in those departments.
 
 ```
